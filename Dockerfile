@@ -25,6 +25,13 @@ RUN case "$(uname -m)" in \
     && rm -f monero-linux-${ARCH}-${MONERO_VERSION}.tar.bz2
 
 ##################
+# -- exporter -- #
+##################
+FROM docker.io/golang:1.22 AS exporter
+
+RUN GO111MODULE=on go install github.com/cirocosta/monero-exporter/cmd/monero-exporter@master
+
+##################
 # --- runner --- #
 ##################
 FROM docker.io/debian:12-slim AS runner
@@ -44,10 +51,12 @@ RUN apt-get update && \
     chown -R monero:monero /opt/bitmonero
 
 COPY --from=builder /opt/monero/* /opt/monero/
+COPY --from=exporter /go/bin/monero-exporter /opt/monero/monero-exporter
+COPY ./entrypoint.sh /entrypoint.sh
 
 USER monero
 WORKDIR /home/monero
 VOLUME /opt/bitmonero
 EXPOSE 18080 18081
 
-ENTRYPOINT ["tini", "--" ,"/opt/monero/monerod"]
+ENTRYPOINT ["tini", "--", "/entrypoint.sh"]
